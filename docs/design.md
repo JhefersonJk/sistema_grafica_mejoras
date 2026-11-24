@@ -30,3 +30,19 @@ El resumen antecede al tablero. Las tarjetas muestran cliente, trabajo, entrega,
 ## Validación
 
 Las pruebas de `tests/browser_smoke.py` ejercitan los flujos principales en Chromium con base temporal. Comprueban 375, 768, 1024 y 1440 px, orientación horizontal, movimiento reducido, teclado, errores de red, escape de HTML y ausencia de desbordamiento horizontal. Las capturas usan datos de ejemplo que no se incorporan a la base del taller.
+
+## Actualización del tablero
+
+La búsqueda admite coincidencias sin tildes, muestra cuántos pedidos coinciden y permite limpiar ambos filtros con un botón. En móvil, los enlaces de etapa llevan el foco al encabezado de su columna.
+
+Se aplicó la [guía de rendimiento de GSAP](https://github.com/greensock/gsap-skills/tree/main/skills/gsap-performance) al gráfico mensual. Las barras aparecen mediante una transformación horizontal en CSS y respetan la preferencia de movimiento reducido. La interfaz sigue usando recursos locales.
+
+Se reutilizan los formateadores y se prepara el índice de búsqueda y el orden de las tarjetas cuando cambian los pedidos. Cada columna conserva su DOM mientras el contenido visible sea idéntico. Las notas y el resumen financiero se actualizan de forma independiente.
+
+Medición en Chromium con 600 pedidos simulados, 200 por etapa. Con `MutationObserver` sobre el tablero, una sincronización forzada con datos idénticos pasó de 603 nodos agregados y 603 eliminados a cero en ambos casos. La prueba de navegador protege la identidad del botón activo y su foco durante esa sincronización. La medición corresponde a cambios del DOM en el cliente.
+
+## Próximas prioridades
+
+1. Automatizar copias de SQLite y ensayar la restauración con una copia de desarrollo.
+2. Medir el tiempo y el tamaño de las tres respuestas periódicas con datos representativos. Si el tráfico repetido resulta significativo, evaluar respuestas condicionales o una consulta de sincronización consolidada.
+3. Medir la apertura del historial con varios años de entregas. Si crece el tiempo de carga, priorizar paginación y búsqueda con índices verificados.

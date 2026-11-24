@@ -96,11 +96,21 @@ def main():
                 expect(page.locator("#summaryDue")).to_contain_text("160")
                 page.get_by_role("searchbox").fill("sin coincidencias")
                 expect(page.locator("#filterSummary")).to_contain_text("0 de 1")
-                page.get_by_role("searchbox").fill("")
+                page.get_by_role("searchbox").fill("papel couche")
+                expect(page.locator(".order-card")).to_have_count(1)
                 page.locator("#priorityFilter").select_option("urgente")
                 expect(page.locator(".order-card")).to_have_count(0)
-                page.locator("#priorityFilter").select_option("all")
-                page.get_by_role("button", name="Pasar a producción").click()
+                page.get_by_role("button", name="Limpiar filtros").click()
+                expect(page.get_by_role("searchbox")).to_be_focused()
+                expect(page.locator("#priorityFilter")).to_have_value("all")
+                flow = page.get_by_role("button", name="Pasar a producción")
+                flow.focus()
+                assert page.evaluate("""async () => {
+                    const button = document.activeElement;
+                    await syncWorkshop(true);
+                    return button.isConnected && button === document.activeElement;
+                }""")
+                flow.click()
                 expect(page.locator("#countProduction")).to_have_text("1")
                 page.get_by_role("button", name="Marcar como listo").click()
                 expect(page.locator("#readyCount")).to_have_text("1")
@@ -247,6 +257,8 @@ def main():
                     print("PASS axe: sin infracciones WCAG A/AA detectadas en tablero y 4 diálogos")
                 # Zoom tipográfico: no cortar contenido horizontalmente.
                 page.set_viewport_size({"width": 375, "height": 812})
+                page.get_by_role("link", name="En producción", exact=True).click()
+                expect(page.locator("#productionTitle")).to_be_focused()
                 page.evaluate("""() => {
                     const sizes = [...document.querySelectorAll('body *')].map(el => [el, parseFloat(getComputedStyle(el).fontSize)]);
                     for (const [el, size] of sizes) el.style.fontSize = `${size * 2}px`;

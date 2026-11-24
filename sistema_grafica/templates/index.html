@@ -39,7 +39,6 @@
         <div class="ink-swatches" aria-hidden="true">
           <i>C</i><i>M</i><i>Y</i><i>K</i>
         </div>
-        <p>De la idea al papel.<br /><strong>Todo en su lugar.</strong></p>
         <div class="studio-tag">
           <span class="avatar">GA</span
           ><span>Gráfica Ali<small>Gestión del taller</small></span>
@@ -61,12 +60,7 @@
         <section class="page-heading" aria-labelledby="pageTitle">
           <div>
             <p class="eyebrow" id="todayLabel">EL DÍA EN EL TALLER</p>
-            <h1 id="pageTitle">
-              Buenas ideas. <span>Mejores impresiones.</span>
-            </h1>
-            <p class="subtitle">
-              Cada pedido, a tiempo. Toda tu producción, en un solo lugar.
-            </p>
+            <h1 id="pageTitle">Tablero de producción</h1>
           </div>
           <button class="button primary" data-open="orderDialog">
             <svg aria-hidden="true"><use href="#icon-plus" /></svg>Nuevo pedido
@@ -121,7 +115,6 @@
                 Mesa de producción
                 <span class="count-pill" id="boardCount">0</span>
               </h2>
-              <p>Un paso más cerca de la entrega.</p>
             </div>
             <div class="board-tools">
               <label class="search-field"
@@ -141,7 +134,15 @@
               </select>
             </div>
           </div>
-          <div class="filter-summary" id="filterSummary" role="status"></div>
+          <div class="filter-feedback">
+            <div class="filter-summary" id="filterSummary" role="status"></div>
+            <button class="button secondary" id="resetFilters" hidden>Limpiar filtros</button>
+          </div>
+          <nav class="stage-links" aria-label="Ir a una etapa">
+            <a href="#pendingTitle">Pendientes</a>
+            <a href="#productionTitle">En producción</a>
+            <a href="#readyTitle">Listos</a>
+          </nav>
           <div id="loadError" class="error-banner" hidden>
             <span>No pudimos actualizar el taller. Revisa tu conexión.</span
             ><button class="button secondary" id="retryLoad">Reintentar</button>
@@ -149,11 +150,10 @@
           <div id="kanbanBoard" class="kanban">
             <section class="column cyan" aria-labelledby="pendingTitle">
               <div class="column-header">
-                <h3 id="pendingTitle">
+                <h3 id="pendingTitle" tabindex="-1">
                   <span class="status-dot"></span>Pendientes
                   <span id="countPending" class="count-pill">0</span>
                 </h3>
-                <span class="step-number">01</span>
               </div>
               <div id="listPending" class="column-content">
                 <p class="empty-state">Cargando pedidos…</p>
@@ -161,11 +161,10 @@
             </section>
             <section class="column magenta" aria-labelledby="productionTitle">
               <div class="column-header">
-                <h3 id="productionTitle">
+                <h3 id="productionTitle" tabindex="-1">
                   <span class="status-dot"></span>En producción
                   <span id="countProduction" class="count-pill">0</span>
                 </h3>
-                <span class="step-number">02</span>
               </div>
               <div id="listProduction" class="column-content">
                 <p class="empty-state">Cargando pedidos…</p>
@@ -173,11 +172,10 @@
             </section>
             <section class="column yellow" aria-labelledby="readyTitle">
               <div class="column-header">
-                <h3 id="readyTitle">
+                <h3 id="readyTitle" tabindex="-1">
                   <span class="status-dot"></span>Listos para entrega
                   <span id="countReady" class="count-pill">0</span>
                 </h3>
-                <span class="step-number">03</span>
               </div>
               <div id="listReady" class="column-content">
                 <p class="empty-state">Cargando pedidos…</p>
@@ -192,7 +190,6 @@
                 <svg aria-hidden="true"><use href="#icon-note" /></svg>Notas del
                 taller
               </h2>
-              <p>Los pequeños detalles también cuentan.</p>
             </div>
             <button class="button secondary" data-open="noteDialog">
               <svg aria-hidden="true"><use href="#icon-plus" /></svg>Agregar
@@ -204,8 +201,7 @@
           </div>
         </section>
         <footer class="page-footer">
-          <span>Hecho para crear. Organizado para crecer.</span
-          ><span class="registration-mark" aria-hidden="true"
+          <span class="registration-mark" aria-hidden="true"
             >C <i></i> M <i></i> Y <i></i> K</span
           >
         </footer>

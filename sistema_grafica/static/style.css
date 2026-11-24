@@ -369,7 +369,14 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
+  padding: clamp(18px, 3vw, 32px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(to right, var(--cyan) 25%, var(--magenta) 25% 50%, var(--yellow) 50% 75%, var(--ink) 75%)
+      top / 100% 4px no-repeat,
+    var(--surface);
 }
 .eyebrow {
   font-size: 10px;
@@ -383,11 +390,6 @@ h1 {
   font-weight: 750;
   line-height: 1.2;
   letter-spacing: -1.4px;
-}
-h1 span {
-  display: block;
-  color: var(--muted);
-  font-weight: 400;
 }
 .subtitle {
   font-size: 13px;
@@ -615,9 +617,18 @@ h2 {
 .filter-summary {
   font-size: 12px;
   color: var(--muted);
+}
+.filter-feedback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 12px;
 }
-.filter-summary:empty {
+.filter-feedback:has(#resetFilters[hidden]) {
+  display: none;
+}
+.stage-links {
   display: none;
 }
 .kanban {
@@ -638,6 +649,8 @@ h2 {
   justify-content: space-between;
   padding: 17px 14px;
   border-bottom: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--tint);
   gap: 5px;
 }
 .column-header h3 {
@@ -654,12 +667,6 @@ h2 {
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--tint);
-}
-.step-number {
-  font:
-    12px ui-monospace,
-    monospace;
-  color: #62665d;
 }
 .column-header .count-pill {
   background: #fff;
@@ -1088,9 +1095,15 @@ th.amount {
 .chart-fill {
   display: block;
   height: 100%;
-  width: var(--bar-width);
+  width: 100%;
+  transform: scaleX(var(--bar-scale));
+  transform-origin: left;
+  animation: reveal-bar 260ms ease-out both;
   background: #00829a;
   border-radius: 3px;
+}
+@keyframes reveal-bar {
+  from { transform: scaleX(0); }
 }
 .chart-row span:last-child {
   text-align: right;
@@ -1352,6 +1365,28 @@ th.amount {
     font-size: 14px;
     max-width: none;
     width: 100%;
+  }
+  .stage-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .stage-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 650;
+    text-decoration: none;
+  }
+  .column-header h3 {
+    scroll-margin-top: 16px;
   }
   .kanban {
     grid-template-columns: 1fr;

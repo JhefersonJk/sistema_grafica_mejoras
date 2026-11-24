@@ -1,8 +1,20 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const money = (value) =>
-  `Bs ${Number(value || 0).toLocaleString("es-BO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const moneyFormat = new Intl.NumberFormat("es-BO", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const deliveryFormat = new Intl.DateTimeFormat("es-BO", {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const money = (value) => `Bs ${moneyFormat.format(Number(value || 0))}`;
+const searchText = (value) =>
+  value.toLocaleLowerCase("es").normalize("NFD").replace(/\p{M}/gu, "");
+const rank = { urgente: 0, normal: 1, leve: 2 };
 const escapeHtml = (value) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -44,8 +56,12 @@ const stages = [
   },
 ];
 let orders = [];
-let syncing = false;
-let lastSnapshot = "";
+let syncing = null;
+let orderSnapshot = "";
+let notesSnapshot = "";
+let summarySnapshot = "";
+let orderMinute = null;
+const columnMarkup = new Map();
 let deliveryId = null;
 const busyOrders = new Set();
 const deletingNotes = new Set();
@@ -92,12 +108,7 @@ function deliveryInfo(value) {
   if (!value || Number.isNaN(date.getTime()))
     return { text: "Sin fecha de entrega", className: "" };
   const minutes = (date - Date.now()) / 60000;
-  const label = date.toLocaleString("es-BO", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const label = deliveryFormat.format(date);
   if (minutes < 0) return { text: `Vencido · ${label}`, className: "late" };
   if (minutes <= 60)
     return { text: `Próximo a vencer · ${label}`, className: "soon" };
@@ -131,45 +142,42 @@ function orderCard(order, stage) {
         <h4>${escapeHtml(order.client_name)}</h4><p class="order-detail">${escapeHtml(order.details)}</p>
         <p class="delivery-time ${delivery.className}">${icon("clock")}<span>${escapeHtml(delivery.text)}</span></p>
         <div class="card-finance"><div>Total<strong>${money(order.price)}</strong></div><div>${due > 0 ? "Por cobrar" : "Pagado"}<strong>${money(due)}</strong></div></div>
-        <button class="flow-button" data-order="${order.id}" data-status="${stage.next}" ${busyOrders.has(order.id) ? "disabled" : ""}>${busyOrders.has(order.id) ? "Actualizando…" : stage.action}${icon(stage.next === "ENTREGADO" ? "check" : "arrow")}</button>${whatsapp}</article>`;
+        <button class="flow-button" data-order="${order.id}" data-status="${stage.next}">${stage.action}${icon(stage.next === "ENTREGADO" ? "check" : "arrow")}</button>${whatsapp}</article>`;
 }
 
 function renderOrders() {
-  const query = $("orderSearch").value.trim().toLocaleLowerCase("es");
+  const query = searchText($("orderSearch").value.trim());
   const priority = $("priorityFilter").value;
+  const filtering = Boolean(query || priority !== "all");
   const filtered = orders.filter(
     (order) =>
-      (!query ||
-        `${order.client_name} ${order.details}`
-          .toLocaleLowerCase("es")
-          .includes(query)) &&
+      (!query || order.search.includes(query)) &&
       (priority === "all" || order.priority === priority),
   );
-  $("activeCount").textContent = orders.length;
-  $("readyCount").textContent = orders.filter(
-    (o) => o.status === "LISTO_ENTREGA",
-  ).length;
-  $("boardCount").textContent = orders.length;
-  $("filterSummary").textContent =
-    query || priority !== "all"
-      ? `${filtered.length} de ${orders.length} pedidos coinciden con tus filtros.`
-      : "";
+  const focused = document.activeElement;
+  const focusedCard = focused?.closest(".order-card");
+  const focusOrder = focusedCard?.querySelector("[data-order]").dataset.order;
+  const focusSelector = focused?.matches(".whatsapp") ? ".whatsapp" : ".flow-button";
+
+  $("filterSummary").textContent = filtering
+    ? `${filtered.length} de ${orders.length} pedidos coinciden con tus filtros.`
+    : "";
+  $("resetFilters").hidden = !filtering;
   for (const stage of stages) {
-    const items = filtered
-      .filter((order) => order.status === stage.status)
-      .sort((a, b) => {
-        const rank = { urgente: 0, normal: 1, leve: 2 };
-        return (
-          (rank[a.priority] ?? 1) - (rank[b.priority] ?? 1) ||
-          (new Date(a.delivery_time).getTime() || Infinity) -
-            (new Date(b.delivery_time).getTime() || Infinity) ||
-          b.id - a.id
-        );
-      });
-    $(stage.count).textContent = items.length;
-    $(stage.list).innerHTML = items.length
+    const items = filtered.filter((order) => order.status === stage.status);
+    const markup = items.length
       ? items.map((item) => orderCard(item, stage)).join("")
-      : `<div class="empty-state">${icon("package")}<strong>${query || priority !== "all" ? "Sin coincidencias" : stage.empty}</strong><p>${query || priority !== "all" ? "Prueba con otro cliente o prioridad." : stage.hint}</p></div>`;
+      : `<div class="empty-state">${icon("package")}<strong>${filtering ? "Sin coincidencias" : stage.empty}</strong><p>${filtering ? "Prueba con otro cliente o prioridad." : stage.hint}</p></div>`;
+    if (columnMarkup.get(stage.list) !== markup) {
+      $(stage.count).textContent = items.length;
+      $(stage.list).innerHTML = markup;
+      columnMarkup.set(stage.list, markup);
+    }
+  }
+  if (focusOrder && !focused.isConnected) {
+    const card = document.querySelector(`[data-order="${focusOrder}"]`)?.closest(".order-card");
+    (card?.querySelector(focusSelector) || card?.querySelector(".flow-button") ||
+      $("orderSearch")).focus({ preventScroll: true });
   }
 }
 
@@ -178,58 +186,84 @@ function renderNotes(notes) {
     ? notes
         .map(
           (note) =>
-            `<article class="note"><p>${escapeHtml(note.content)}</p><button class="icon-button" data-delete-note="${note.id}" aria-label="Eliminar nota: ${escapeHtml(note.content.slice(0, 40))}" ${deletingNotes.has(note.id) ? "disabled" : ""}>${icon("close")}</button></article>`,
+            `<article class="note"><p>${escapeHtml(note.content)}</p><button class="icon-button" data-delete-note="${note.id}" aria-label="Eliminar nota: ${escapeHtml(note.content.slice(0, 40))}">${icon("close")}</button></article>`,
         )
         .join("")
     : '<div class="empty-state">Un espacio para tus pendientes. Agrega tu primera nota.</div>';
 }
 
 async function syncWorkshop(force = false) {
-  if (syncing || (document.hidden && !force)) return;
-  syncing = true;
+  if (document.hidden && !force) return;
+  if (syncing) {
+    if (force) {
+      await syncing;
+      return syncWorkshop(true);
+    }
+    return syncing;
+  }
+  syncing = fetchWorkshop();
+  try {
+    await syncing;
+  } finally {
+    syncing = null;
+  }
+}
+
+async function fetchWorkshop() {
   try {
     const [newOrders, notes, summary] = await Promise.all([
       api("/api/orders/"),
       api("/api/notes/"),
       api("/api/financial/summary"),
     ]);
-    const snapshot = JSON.stringify([
-      newOrders,
-      notes,
-      summary,
-      Math.floor(Date.now() / 60000),
-    ]);
-    if (snapshot !== lastSnapshot || force) {
-      // No reconstruir tarjetas mientras un usuario navega sus controles con teclado.
-      const focused = document.activeElement;
-      const focusOrder = focused?.dataset.order;
-      const focusNote = focused?.dataset.deleteNote;
-      orders = newOrders;
+    const nextOrders = JSON.stringify(newOrders);
+    const minute = Math.floor(Date.now() / 60000);
+    const ordersChanged = nextOrders !== orderSnapshot;
+    if (ordersChanged) {
+      orders = newOrders.map((order) => ({
+        ...order,
+        search: searchText(`${order.client_name} ${order.details}`),
+        deadline: Date.parse(order.delivery_time) || Infinity,
+      })).sort((a, b) =>
+        (rank[a.priority] ?? 1) - (rank[b.priority] ?? 1) ||
+        a.deadline - b.deadline || b.id - a.id,
+      );
+      $("activeCount").textContent = orders.length;
+      $("readyCount").textContent = orders.filter((order) => order.status === "LISTO_ENTREGA").length;
+      $("boardCount").textContent = orders.length;
+      orderSnapshot = nextOrders;
+    }
+    if (ordersChanged || minute !== orderMinute) {
       renderOrders();
+      orderMinute = minute;
+    }
+
+    const nextNotes = JSON.stringify(notes);
+    if (nextNotes !== notesSnapshot) {
+      const focusNote = document.activeElement?.dataset.deleteNote;
       renderNotes(notes);
-      if (focusOrder)
-        document
-          .querySelector(`[data-order="${focusOrder}"]`)
-          ?.focus({ preventScroll: true });
       if (focusNote)
-        document
-          .querySelector(`[data-delete-note="${focusNote}"]`)
-          ?.focus({ preventScroll: true });
+        (document.querySelector(`[data-delete-note="${focusNote}"]`) ||
+          document.querySelector('[data-open="noteDialog"]')).focus({ preventScroll: true });
+      notesSnapshot = nextNotes;
+    }
+
+    const nextSummary = JSON.stringify(summary);
+    if (nextSummary !== summarySnapshot) {
       $("summaryDue").textContent = money(summary.total_por_cobrar);
       $("summaryCollected").textContent = money(summary.monto_recaudado_hoy);
       $("summaryDelivered").textContent =
         `${summary.pedidos_entregados_hoy} ${summary.pedidos_entregados_hoy === 1 ? "pedido entregado" : "pedidos entregados"} · valor total`;
-      lastSnapshot = snapshot;
+      summarySnapshot = nextSummary;
     }
-    $("connectionStatus").textContent = "Taller sincronizado";
+    if ($("connectionStatus").textContent !== "Taller sincronizado")
+      $("connectionStatus").textContent = "Taller sincronizado";
     $("connectionStatus").classList.remove("offline");
     $("loadError").hidden = true;
   } catch {
     $("connectionStatus").textContent = "Sin conexión";
     $("connectionStatus").classList.add("offline");
     $("loadError").hidden = false;
-  } finally {
-    syncing = false;
   }
 }
 
@@ -337,7 +371,7 @@ async function loadReport() {
     const bars = data.grafico_linea.etiquetas
       .map(
         (label, index) =>
-          `<div class="chart-row"><span>${escapeHtml(label)}</span><span class="chart-track" aria-hidden="true"><span class="chart-fill" style="--bar-width:${Math.max(0, (values[index] / maximum) * 100)}%"></span></span><span>${money(values[index])}</span></div>`,
+          `<div class="chart-row"><span>${escapeHtml(label)}</span><span class="chart-track" aria-hidden="true"><span class="chart-fill" style="--bar-scale:${Math.max(0, values[index] / maximum)}"></span></span><span>${money(values[index])}</span></div>`,
       )
       .join("");
     $("reportContent").innerHTML =
@@ -367,6 +401,7 @@ document.addEventListener("click", async (event) => {
   const flow = event.target.closest("[data-order]");
   if (flow) {
     const id = Number(flow.dataset.order);
+    if (busyOrders.has(id)) return;
     if (flow.dataset.status === "ENTREGADO") {
       deliveryId = id;
       const order = orders.find((item) => item.id === id);
@@ -463,6 +498,12 @@ $("noteForm").addEventListener("submit", (event) =>
 );
 $("orderSearch").addEventListener("input", renderOrders);
 $("priorityFilter").addEventListener("change", renderOrders);
+$("resetFilters").addEventListener("click", () => {
+  $("orderSearch").value = "";
+  $("priorityFilter").value = "all";
+  $("orderSearch").focus();
+  renderOrders();
+});
 $("retryLoad").addEventListener("click", () => syncWorkshop(true));
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) syncWorkshop(true);
