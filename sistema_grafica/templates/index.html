@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#18191b" />
+    <title>Gráfica Ali · Taller</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="/static/script.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Ir al tablero</a>
+    <aside class="sidebar" aria-label="Navegación principal">
+      <a class="brand" href="/" aria-label="Gráfica Ali, inicio"
+        ><span class="brand-mark" aria-hidden="true"
+          ><i></i><i></i><i></i><i></i></span
+        ><span
+          >gráfica<span class="brand-ali"
+            >ali<span class="brand-period">.</span></span
+          ></span
+        ></a
+      >
+      <div class="workspace-label">ESPACIO DE TRABAJO</div>
+      <nav>
+        <a href="#main" class="nav-item active" aria-current="page"
+          ><svg aria-hidden="true"><use href="#icon-board" /></svg>Tablero de
+          pedidos<span class="nav-dot"></span
+        ></a>
+        <button class="nav-item" data-open="historyDialog">
+          <svg aria-hidden="true"><use href="#icon-history" /></svg>Historial de
+          entregas
+        </button>
+        <button class="nav-item" data-open="reportDialog">
+          <svg aria-hidden="true"><use href="#icon-chart" /></svg>Reporte
+          mensual
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="ink-swatches" aria-hidden="true">
+          <i>C</i><i>M</i><i>Y</i><i>K</i>
+        </div>
+        <p>De la idea al papel.<br /><strong>Todo en su lugar.</strong></p>
+        <div class="studio-tag">
+          <span class="avatar">GA</span
+          ><span>Gráfica Ali<small>Gestión del taller</small></span>
+        </div>
+      </div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <header class="topbar">
+        <span class="breadcrumb"
+          >Mi taller <span>/</span> <strong>Tablero</strong></span
+        >
+        <div class="topbar-end">
+          <span id="connectionStatus" class="connection" role="status"
+            >Conectando…</span
+          ><span class="avatar small" aria-hidden="true">GA</span>
+        </div>
+      </header>
+      <div class="page-content">
+        <section class="page-heading" aria-labelledby="pageTitle">
+          <div>
+            <p class="eyebrow" id="todayLabel">EL DÍA EN EL TALLER</p>
+            <h1 id="pageTitle">
+              Buenas ideas. <span>Mejores impresiones.</span>
+            </h1>
+            <p class="subtitle">
+              Cada pedido, a tiempo. Toda tu producción, en un solo lugar.
+            </p>
+          </div>
+          <button class="button primary" data-open="orderDialog">
+            <svg aria-hidden="true"><use href="#icon-plus" /></svg>Nuevo pedido
+          </button>
+        </section>
+        <section class="metrics" aria-label="Resumen del taller">
+          <article class="metric cyan">
+            <div class="metric-label">
+              En el taller<svg aria-hidden="true">
+                <use href="#icon-board" />
+              </svg>
+            </div>
+            <div class="metric-value" id="activeCount">—</div>
+            <p>Pedidos activos</p>
+            <span class="metric-letter" aria-hidden="true">C</span>
+          </article>
+          <article class="metric magenta">
+            <div class="metric-label">
+              Listos para salir<svg aria-hidden="true">
+                <use href="#icon-package" />
+              </svg>
+            </div>
+            <div class="metric-value" id="readyCount">—</div>
+            <p>Esperando su entrega</p>
+            <span class="metric-letter" aria-hidden="true">M</span>
+          </article>
+          <article class="metric yellow">
+            <div class="metric-label">
+              Por cobrar<svg aria-hidden="true">
+                <use href="#icon-wallet" />
+              </svg>
+            </div>
+            <div class="metric-value money" id="summaryDue">—</div>
+            <p>Saldo de pedidos activos</p>
+            <span class="metric-letter" aria-hidden="true">Y</span>
+          </article>
+          <article class="metric black">
+            <div class="metric-label">
+              Entregado hoy<svg aria-hidden="true">
+                <use href="#icon-check" />
+              </svg>
+            </div>
+            <div class="metric-value money" id="summaryCollected">—</div>
+            <p id="summaryDelivered">Esperando resumen</p>
+            <span class="metric-letter" aria-hidden="true">K</span>
+          </article>
+        </section>
+        <section class="production" aria-labelledby="boardTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="boardTitle">
+                Mesa de producción
+                <span class="count-pill" id="boardCount">0</span>
+              </h2>
+              <p>Un paso más cerca de la entrega.</p>
+            </div>
+            <div class="board-tools">
+              <label class="search-field"
+                ><svg aria-hidden="true"><use href="#icon-search" /></svg
+                ><input
+                  id="orderSearch"
+                  type="search"
+                  placeholder="Buscar cliente o trabajo…"
+                  aria-label="Buscar cliente o trabajo" /></label
+              ><label class="sr-only" for="priorityFilter"
+                >Filtrar por prioridad</label
+              ><select id="priorityFilter">
+                <option value="all">Todas las prioridades</option>
+                <option value="urgente">Urgente</option>
+                <option value="normal">Normal</option>
+                <option value="leve">Sin prisa</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-summary" id="filterSummary" role="status"></div>
+          <div id="loadError" class="error-banner" hidden>
+            <span>No pudimos actualizar el taller. Revisa tu conexión.</span
+            ><button class="button secondary" id="retryLoad">Reintentar</button>
+          </div>
+          <div id="kanbanBoard" class="kanban">
+            <section class="column cyan" aria-labelledby="pendingTitle">
+              <div class="column-header">
+                <h3 id="pendingTitle">
+                  <span class="status-dot"></span>Pendientes
+                  <span id="countPending" class="count-pill">0</span>
+                </h3>
+                <span class="step-number">01</span>
+              </div>
+              <div id="listPending" class="column-content">
+                <p class="empty-state">Cargando pedidos…</p>
+              </div>
+            </section>
+            <section class="column magenta" aria-labelledby="productionTitle">
+              <div class="column-header">
+                <h3 id="productionTitle">
+                  <span class="status-dot"></span>En producción
+                  <span id="countProduction" class="count-pill">0</span>
+                </h3>
+                <span class="step-number">02</span>
+              </div>
+              <div id="listProduction" class="column-content">
+                <p class="empty-state">Cargando pedidos…</p>
+              </div>
+            </section>
+            <section class="column yellow" aria-labelledby="readyTitle">
+              <div class="column-header">
+                <h3 id="readyTitle">
+                  <span class="status-dot"></span>Listos para entrega
+                  <span id="countReady" class="count-pill">0</span>
+                </h3>
+                <span class="step-number">03</span>
+              </div>
+              <div id="listReady" class="column-content">
+                <p class="empty-state">Cargando pedidos…</p>
+              </div>
+            </section>
+          </div>
+        </section>
+        <section class="notes-section" aria-labelledby="notesTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="notesTitle">
+                <svg aria-hidden="true"><use href="#icon-note" /></svg>Notas del
+                taller
+              </h2>
+              <p>Los pequeños detalles también cuentan.</p>
+            </div>
+            <button class="button secondary" data-open="noteDialog">
+              <svg aria-hidden="true"><use href="#icon-plus" /></svg>Agregar
+              nota
+            </button>
+          </div>
+          <div id="quickNotesList" class="notes-grid">
+            <p class="empty-state">Cargando notas…</p>
+          </div>
+        </section>
+        <footer class="page-footer">
+          <span>Hecho para crear. Organizado para crecer.</span
+          ><span class="registration-mark" aria-hidden="true"
+            >C <i></i> M <i></i> Y <i></i> K</span
+          >
+        </footer>
+      </div>
+    </main>
+    <dialog id="orderDialog" aria-labelledby="orderTitle">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">VAMOS A CREAR ALGO</p>
+          <h2 id="orderTitle">Nuevo pedido</h2>
+        </div>
+        <button class="icon-button" data-close aria-label="Cerrar nuevo pedido">
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
+        </button>
+      </div>
+      <form id="orderForm">
+        <div class="form-error" role="alert" hidden></div>
+        <label for="client_name">Cliente</label
+        ><input
+          autofocus
+          id="client_name"
+          name="client_name"
+          maxlength="160"
+          placeholder="Nombre del cliente"
+          required
+        /><label for="details">Detalle del trabajo</label
+        ><textarea
+          id="details"
+          name="details"
+          rows="3"
+          maxlength="2000"
+          placeholder="Ej. 500 tarjetas, papel couché, impresión a color"
+          required
+        ></textarea>
+        <div class="form-grid">
+          <div>
+            <label for="delivery_date">Fecha de entrega</label
+            ><input
+              type="date"
+              id="delivery_date"
+              name="delivery_date"
+              required
+            />
+          </div>
+          <div>
+            <label for="delivery_hour">Hora de entrega</label
+            ><input
+              type="time"
+              id="delivery_hour"
+              name="delivery_hour"
+              required
+            />
+          </div>
+        </div>
+        <label for="priority">Prioridad</label
+        ><select id="priority" name="priority">
+          <option value="normal">Normal</option>
+          <option value="urgente">Urgente</option>
+          <option value="leve">Sin prisa</option>
+        </select>
+        <div class="form-grid">
+          <div>
+            <label for="price">Precio total (Bs)</label
+            ><input
+              type="number"
+              id="price"
+              name="price"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              required
+            />
+          </div>
+          <div>
+            <label for="advance_payment">Adelanto (Bs)</label
+            ><input
+              type="number"
+              id="advance_payment"
+              name="advance_payment"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              value="0"
+              aria-describedby="advanceHint"
+            /><small id="advanceHint">No puede superar el total.</small>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="button secondary" data-close>
+            Cancelar</button
+          ><button type="submit" class="button primary">Guardar pedido</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="noteDialog" aria-labelledby="noteTitle">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">QUE NO SE TE PASE</p>
+          <h2 id="noteTitle">Nueva nota</h2>
+        </div>
+        <button class="icon-button" data-close aria-label="Cerrar nueva nota">
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
+        </button>
+      </div>
+      <form id="noteForm">
+        <div class="form-error" role="alert" hidden></div>
+        <label for="note_content">Recordatorio</label
+        ><textarea
+          autofocus
+          id="note_content"
+          name="content"
+          rows="5"
+          maxlength="1000"
+          placeholder="Una idea, un pendiente o algo por recordar…"
+          required
+        ></textarea>
+        <div class="form-actions">
+          <button type="button" class="button secondary" data-close>
+            Cancelar</button
+          ><button type="submit" class="button primary">Guardar nota</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog
+      id="historyDialog"
+      class="wide-dialog"
+      aria-labelledby="historyTitle"
+    >
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">TRABAJO BIEN HECHO</p>
+          <h2 id="historyTitle">Historial de entregas</h2>
+        </div>
+        <button class="icon-button" data-close aria-label="Cerrar historial">
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
+        </button>
+      </div>
+      <div id="historyContent" aria-live="polite"></div>
+    </dialog>
+    <dialog id="reportDialog" class="wide-dialog" aria-labelledby="reportTitle">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">TU TALLER EN NÚMEROS</p>
+          <h2 id="reportTitle">Reporte mensual</h2>
+          <p id="reportMonth" class="subtitle"></p>
+        </div>
+        <button class="icon-button" data-close aria-label="Cerrar reporte">
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
+        </button>
+      </div>
+      <div id="reportContent" aria-live="polite"></div>
+    </dialog>
+    <dialog id="confirmDialog" aria-labelledby="confirmTitle">
+      <div class="dialog-header">
+        <h2 id="confirmTitle">Confirmar entrega</h2>
+        <button class="icon-button" data-close aria-label="Cerrar confirmación">
+          <svg aria-hidden="true"><use href="#icon-close" /></svg>
+        </button>
+      </div>
+      <p id="confirmText"></p>
+      <p class="muted">
+        El pedido pasará al historial y se registrará en las ventas de hoy. El
+        precio total se considera cobrado al entregar.
+      </p>
+      <div class="form-error" id="confirmError" role="alert" hidden></div>
+      <div class="form-actions">
+        <button class="button secondary" data-close>Cancelar</button
+        ><button class="button primary" id="confirmDelivery">
+          Confirmar entrega
+        </button>
+      </div>
+    </dialog>
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      class="svg-library"
+      aria-hidden="true"
+    >
+      <defs>
+        <symbol id="icon-board" viewBox="0 0 24 24">
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M9 4v16m6-16v16" />
+        </symbol>
+        <symbol id="icon-plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="icon-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
+        </symbol>
+        <symbol id="icon-search" viewBox="0 0 24 24">
+          <circle cx="10.5" cy="10.5" r="6.5" />
+          <path d="m16 16 4 4" />
+        </symbol>
+        <symbol id="icon-history" viewBox="0 0 24 24">
+          <path d="M3 11a9 9 0 1 1 2 7M3 5v6h6m3-4v5l3 2" />
+        </symbol>
+        <symbol id="icon-chart" viewBox="0 0 24 24">
+          <path d="M4 4v16h17M8 15v-4m5 4V6m5 9V9" />
+        </symbol>
+        <symbol id="icon-package" viewBox="0 0 24 24">
+          <path d="m3 7 9-4 9 4v10l-9 4-9-4V7Zm0 0 9 5 9-5m-9 5v9M7 5l10 5" />
+        </symbol>
+        <symbol id="icon-wallet" viewBox="0 0 24 24">
+          <path
+            d="M20 8V5H5a2 2 0 0 0 0 4h16v11H5a2 2 0 0 1-2-2V7m18 6h-5v3h5"
+          />
+        </symbol>
+        <symbol id="icon-check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L19 6" />
+        </symbol>
+        <symbol id="icon-note" viewBox="0 0 24 24">
+          <path d="M14 21H4V3h16v12l-6 6Zm0 0v-6h6M8 8h8m-8 4h5" />
+        </symbol>
+        <symbol id="icon-clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </symbol>
+        <symbol id="icon-arrow" viewBox="0 0 24 24">
+          <path d="M4 12h16m-6-6 6 6-6 6" />
+        </symbol>
+      </defs>
+    </svg>
+  </body>
+</html>
