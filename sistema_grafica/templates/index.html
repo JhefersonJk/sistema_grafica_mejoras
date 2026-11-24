@@ -23,16 +23,13 @@
       <div class="workspace-label">ESPACIO DE TRABAJO</div>
       <nav>
         <a href="#main" class="nav-item active" aria-current="page"
-          ><svg aria-hidden="true"><use href="#icon-board" /></svg>Tablero de
-          pedidos<span class="nav-dot"></span
+          ><svg aria-hidden="true"><use href="#icon-board" /></svg><span class="nav-label">Tablero de pedidos</span><span class="nav-dot" aria-hidden="true"></span
         ></a>
         <button class="nav-item" data-open="historyDialog">
-          <svg aria-hidden="true"><use href="#icon-history" /></svg>Historial de
-          entregas
+          <svg aria-hidden="true"><use href="#icon-history" /></svg><span class="nav-label">Historial de entregas</span>
         </button>
         <button class="nav-item" data-open="reportDialog">
-          <svg aria-hidden="true"><use href="#icon-chart" /></svg>Reporte
-          mensual
+          <svg aria-hidden="true"><use href="#icon-chart" /></svg><span class="nav-label">Reporte mensual</span>
         </button>
       </nav>
       <div class="sidebar-bottom">
@@ -97,7 +94,7 @@
             <p>Saldo de pedidos activos</p>
             <span class="metric-letter" aria-hidden="true">Y</span>
           </article>
-          <article class="metric black">
+          <article class="metric black" id="deliveredMetric">
             <div class="metric-label">
               Entregado hoy<svg aria-hidden="true">
                 <use href="#icon-check" />
@@ -150,8 +147,9 @@
           <div id="kanbanBoard" class="kanban">
             <section class="column cyan" aria-labelledby="pendingTitle">
               <div class="column-header">
+                <span class="stage-icon"><svg aria-hidden="true"><use href="#icon-clock" /></svg></span>
                 <h3 id="pendingTitle" tabindex="-1">
-                  <span class="status-dot"></span>Pendientes
+                  <span>Pendientes</span>
                   <span id="countPending" class="count-pill">0</span>
                 </h3>
               </div>
@@ -161,8 +159,9 @@
             </section>
             <section class="column magenta" aria-labelledby="productionTitle">
               <div class="column-header">
+                <span class="stage-icon"><svg aria-hidden="true"><use href="#icon-board" /></svg></span>
                 <h3 id="productionTitle" tabindex="-1">
-                  <span class="status-dot"></span>En producción
+                  <span>En producción</span>
                   <span id="countProduction" class="count-pill">0</span>
                 </h3>
               </div>
@@ -172,8 +171,9 @@
             </section>
             <section class="column yellow" aria-labelledby="readyTitle">
               <div class="column-header">
+                <span class="stage-icon"><svg aria-hidden="true"><use href="#icon-package" /></svg></span>
                 <h3 id="readyTitle" tabindex="-1">
-                  <span class="status-dot"></span>Listos para entrega
+                  <span>Listos para entrega</span>
                   <span id="countReady" class="count-pill">0</span>
                 </h3>
               </div>
@@ -209,90 +209,113 @@
     </main>
     <dialog id="orderDialog" aria-labelledby="orderTitle">
       <div class="dialog-header">
-        <div>
-          <p class="eyebrow">VAMOS A CREAR ALGO</p>
-          <h2 id="orderTitle">Nuevo pedido</h2>
-        </div>
+        <h2 id="orderTitle">Nuevo pedido</h2>
         <button class="icon-button" data-close aria-label="Cerrar nuevo pedido">
           <svg aria-hidden="true"><use href="#icon-close" /></svg>
         </button>
       </div>
       <form id="orderForm">
-        <div class="form-error" role="alert" hidden></div>
-        <label for="client_name">Cliente</label
-        ><input
-          autofocus
-          id="client_name"
-          name="client_name"
-          maxlength="160"
-          placeholder="Nombre del cliente"
-          required
-        /><label for="details">Detalle del trabajo</label
-        ><textarea
-          id="details"
-          name="details"
-          rows="3"
-          maxlength="2000"
-          placeholder="Ej. 500 tarjetas, papel couché, impresión a color"
-          required
-        ></textarea>
-        <div class="form-grid">
-          <div>
-            <label for="delivery_date">Fecha de entrega</label
-            ><input
-              type="date"
-              id="delivery_date"
-              name="delivery_date"
+        <div class="order-form-body">
+          <fieldset class="order-fields cyan">
+            <legend>Cliente y trabajo</legend>
+            <label for="client_name">Cliente</label>
+            <input
+              autofocus
+              id="client_name"
+              name="client_name"
+              maxlength="160"
+              placeholder="Nombre del cliente"
               required
             />
-          </div>
-          <div>
-            <label for="delivery_hour">Hora de entrega</label
-            ><input
-              type="time"
-              id="delivery_hour"
-              name="delivery_hour"
+            <label for="details">Detalle del trabajo</label>
+            <textarea
+              id="details"
+              name="details"
+              rows="2"
+              maxlength="2000"
+              placeholder="Ej. 500 tarjetas, papel couché, impresión a color"
               required
-            />
-          </div>
+            ></textarea>
+          </fieldset>
+
+          <fieldset class="order-fields magenta">
+            <legend>Entrega y prioridad</legend>
+            <div class="form-grid">
+              <div>
+                <label for="delivery_date">Fecha de entrega</label>
+                <input type="date" id="delivery_date" name="delivery_date" required />
+                <div class="field-shortcuts" role="group" aria-label="Fechas rápidas">
+                  <button type="button" data-date-offset="0" aria-pressed="false">Hoy</button>
+                  <button type="button" data-date-offset="1" aria-pressed="false">Mañana</button>
+                </div>
+              </div>
+              <div>
+                <label for="delivery_hour">Hora de entrega</label>
+                <input type="time" id="delivery_hour" name="delivery_hour" required />
+                <div class="field-shortcuts" role="group" aria-label="Horas rápidas">
+                  <button type="button" data-delivery-hour="12:00" aria-pressed="false">12:00</button>
+                  <button type="button" data-delivery-hour="17:00" aria-pressed="false">17:00</button>
+                </div>
+              </div>
+            </div>
+            <fieldset class="priority-picker">
+              <legend>Prioridad</legend>
+              <div class="priority-options">
+                <label class="priority-option normal">
+                  <input type="radio" name="priority" value="normal" checked />
+                  <span>Normal</span>
+                </label>
+                <label class="priority-option urgente">
+                  <input type="radio" name="priority" value="urgente" />
+                  <span>Urgente</span>
+                </label>
+                <label class="priority-option leve">
+                  <input type="radio" name="priority" value="leve" />
+                  <span>Sin prisa</span>
+                </label>
+              </div>
+            </fieldset>
+          </fieldset>
+
+          <fieldset class="order-fields yellow">
+            <legend>Importe y saldo</legend>
+            <div class="form-grid">
+              <div>
+                <label for="price">Precio total (Bs)</label>
+                <input
+                  type="number" id="price" name="price" min="0" step="0.01"
+                  inputmode="decimal" placeholder="0,00" required
+                />
+              </div>
+              <div>
+                <label for="advance_payment">Adelanto (Bs)</label>
+                <input
+                  type="number" id="advance_payment" name="advance_payment" min="0" step="0.01"
+                  inputmode="decimal" placeholder="0,00" aria-describedby="advanceHint" aria-errormessage="orderFormError"
+                />
+              </div>
+            </div>
+            <small id="advanceHint">Deja el adelanto vacío si aún no recibiste un pago.</small>
+            <div class="order-balance">
+              <span>Saldo por cobrar</span>
+              <output id="orderBalance" for="price advance_payment" aria-label="Saldo por cobrar">—</output>
+            </div>
+          </fieldset>
+
+          <div class="form-error" id="orderFormError" role="alert" hidden></div>
         </div>
-        <label for="priority">Prioridad</label
-        ><select id="priority" name="priority">
-          <option value="normal">Normal</option>
-          <option value="urgente">Urgente</option>
-          <option value="leve">Sin prisa</option>
-        </select>
-        <div class="form-grid">
-          <div>
-            <label for="price">Precio total (Bs)</label
-            ><input
-              type="number"
-              id="price"
-              name="price"
-              min="0"
-              step="0.01"
-              placeholder="0,00"
-              required
-            />
+        <div class="order-form-footer">
+          <label class="keep-order-open">
+            <input type="checkbox" name="keepOpen" />
+            Registrar otro después de guardar
+          </label>
+          <p class="order-saved" id="orderSaved" role="status"></p>
+          <div class="form-actions">
+            <button type="button" class="button secondary" data-close>Cancelar</button>
+            <button type="submit" class="button primary">
+              <svg aria-hidden="true"><use href="#icon-check" /></svg><span>Guardar pedido</span>
+            </button>
           </div>
-          <div>
-            <label for="advance_payment">Adelanto (Bs)</label
-            ><input
-              type="number"
-              id="advance_payment"
-              name="advance_payment"
-              min="0"
-              step="0.01"
-              placeholder="0,00"
-              value="0"
-              aria-describedby="advanceHint"
-            /><small id="advanceHint">No puede superar el total.</small>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="button secondary" data-close>
-            Cancelar</button
-          ><button type="submit" class="button primary">Guardar pedido</button>
         </div>
       </form>
     </dialog>

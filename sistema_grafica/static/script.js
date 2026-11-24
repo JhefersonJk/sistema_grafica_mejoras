@@ -62,6 +62,14 @@ let notesSnapshot = "";
 let summarySnapshot = "";
 let orderMinute = null;
 const columnMarkup = new Map();
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+const stackedBoard = window.matchMedia("(max-width: 640px)");
+const stageFeedback = {
+  PENDIENTES: { color: "cyan", text: "Pedido guardado en Pendientes." },
+  EN_PRODUCCION: { color: "magenta", text: "Pedido en producción." },
+  LISTO_ENTREGA: { color: "yellow", text: "Pedido listo para entrega." },
+  ENTREGADO: { color: "delivered", text: "Pedido entregado y registrado en el historial." },
+};
 let deliveryId = null;
 const busyOrders = new Set();
 const deletingNotes = new Set();
@@ -90,17 +98,73 @@ async function api(path, options = {}) {
   return data;
 }
 
-function toast(message, error = false) {
+function toast(message, error = false, color = "") {
   const element = document.createElement("div");
-  element.className = `toast${error ? " error" : ""}`;
-  element.textContent = message;
+  element.className = `toast ${error ? "error" : color}`;
+  if (color) element.innerHTML = icon("check");
+  const text = document.createElement("span");
+  text.textContent = message;
+  element.append(text);
   $("toasts").append(element);
   setTimeout(() => element.remove(), 5000);
 }
 
-function localDate() {
+function localDate(offset = 0) {
   const now = new Date();
+  now.setDate(now.getDate() + offset);
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+const dateShortcuts = [...document.querySelectorAll("[data-date-offset]")];
+const hourShortcuts = [...document.querySelectorAll("[data-delivery-hour]")];
+
+function updateScheduleShortcuts() {
+  for (const button of dateShortcuts) {
+    const selected = $("delivery_date").value === localDate(Number(button.dataset.dateOffset));
+    button.setAttribute("aria-pressed", String(selected));
+  }
+  for (const button of hourShortcuts) {
+    const selected = $("delivery_hour").value === button.dataset.deliveryHour;
+    button.setAttribute("aria-pressed", String(selected));
+  }
+}
+
+function updateOrderBalance() {
+  const price = $("price").valueAsNumber;
+  const advanceField = $("advance_payment");
+  const advance = advanceField.valueAsNumber || 0;
+  const valid = Number.isFinite(price) && $("price").validity.valid &&
+    advanceField.validity.valid && advance <= price;
+  $("orderBalance").textContent = valid ? money(price - advance) : "—";
+}
+
+function animateOrderStage(id, status) {
+  if (status === "ENTREGADO") {
+    if (reducedMotion.matches) return;
+    $("deliveredMetric").animate(
+      [{ transform: "scale(1)" }, { transform: "scale(1.025)" }, { transform: "scale(1)" }],
+      { duration: 440, easing: "ease-out" },
+    );
+    return;
+  }
+  const stage = stages.find((entry) => entry.status === status);
+  const action = $(stage.list).querySelector(`[data-order="${id}"]`);
+  if (action && action === document.activeElement) {
+    action.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }
+  if (reducedMotion.matches) return;
+  const card = action?.closest(".order-card");
+  const enter = status === "PENDIENTES" || stackedBoard.matches
+    ? "translateY(-12px)"
+    : "translateX(-16px)";
+  card?.animate(
+    [{ transform: enter, opacity: 0.55 }, { transform: "none", opacity: 1 }],
+    { duration: 300, easing: "cubic-bezier(.2,.75,.3,1)" },
+  );
+  $(stage.list).previousElementSibling.querySelector(".stage-icon").animate(
+    [{ transform: "scale(1)" }, { transform: "scale(1.2)" }, { transform: "scale(1)" }],
+    { duration: 380, easing: "ease-out" },
+  );
 }
 
 function deliveryInfo(value) {
@@ -273,8 +337,12 @@ function openDialog(id) {
   dialog.querySelectorAll(".form-error").forEach((error) => {
     error.hidden = true;
   });
-  if (id === "orderDialog" && !$("delivery_date").value)
-    $("delivery_date").value = localDate();
+  if (id === "orderDialog") {
+    if (!$("delivery_date").value) $("delivery_date").value = localDate();
+    $("orderSaved").textContent = "";
+    updateScheduleShortcuts();
+    updateOrderBalance();
+  }
   dialog.showModal();
   if (id === "historyDialog") loadHistory();
   if (id === "reportDialog") loadReport();
@@ -286,23 +354,23 @@ function showFormError(form, message) {
   error.hidden = false;
 }
 
-async function submitForm(event, path, buildData, success) {
+async function submitForm(event, path, buildData, onSaved) {
   event.preventDefault();
   const form = event.currentTarget;
   const button = form.querySelector('[type="submit"]');
   if (button.disabled) return;
-  const data = buildData();
+  const errorBox = form.querySelector(".form-error");
+  errorBox.hidden = true;
+  const data = buildData(form);
   if (!data) return;
-  const label = button.textContent;
+  const label = button.querySelector("span") || button;
+  const idleText = label.textContent;
   button.disabled = true;
-  button.textContent = "Guardando…";
-  form.querySelector(".form-error").hidden = true;
+  button.setAttribute("aria-busy", "true");
+  label.textContent = "Guardando…";
+  let saved;
   try {
-    await api(path, { method: "POST", body: JSON.stringify(data) });
-    form.closest("dialog").close();
-    form.reset();
-    toast(success);
-    await syncWorkshop(true);
+    saved = await api(path, { method: "POST", body: JSON.stringify(data) });
   } catch (error) {
     showFormError(
       form,
@@ -310,26 +378,30 @@ async function submitForm(event, path, buildData, success) {
         ? "No hay conexión. Tus datos siguen aquí; vuelve a intentarlo."
         : error.message,
     );
+    errorBox.scrollIntoView({ block: "nearest", behavior: "instant" });
+    return;
   } finally {
     button.disabled = false;
-    button.textContent = label;
+    button.removeAttribute("aria-busy");
+    label.textContent = idleText;
   }
+  await onSaved(form, saved);
 }
 
 async function changeStatus(id, status, button) {
-  if (busyOrders.has(id)) return false;
+  if (busyOrders.has(id)) return;
   busyOrders.add(id);
-  if (button) button.disabled = true;
+  button.setAttribute("aria-disabled", "true");
+  button.setAttribute("aria-busy", "true");
   try {
-    await api(`/orders/${id}/status?status=${encodeURIComponent(status)}`, {
-      method: "PUT",
-    });
-    toast(
-      status === "ENTREGADO"
-        ? "Pedido entregado. ¡Otro trabajo bien hecho!"
-        : "Pedido actualizado.",
-    );
-    return true;
+    await api(`/orders/${id}/status?status=${encodeURIComponent(status)}`, { method: "PUT" });
+    if (status === "ENTREGADO") {
+      $("confirmDialog").close();
+      deliveryId = null;
+    }
+    const feedback = stageFeedback[status];
+    toast(feedback.text, false, feedback.color);
+    await syncWorkshop(true);
   } catch (error) {
     if (status === "ENTREGADO") {
       $("confirmError").textContent =
@@ -338,11 +410,13 @@ async function changeStatus(id, status, button) {
     } else {
       toast("No se pudo actualizar el pedido. Inténtalo de nuevo.", true);
     }
-    return false;
+    return;
   } finally {
     busyOrders.delete(id);
-    if (button) button.disabled = false;
+    button.removeAttribute("aria-disabled");
+    button.removeAttribute("aria-busy");
   }
+  animateOrderStage(id, status);
 }
 
 async function loadHistory() {
@@ -390,7 +464,8 @@ document.addEventListener("click", async (event) => {
   }
   const close = event.target.closest("[data-close]");
   if (close) {
-    close.closest("dialog").close();
+    const dialog = close.closest("dialog");
+    if (!dialog.querySelector('[aria-busy="true"]')) dialog.close();
     return;
   }
   const retry = event.target.closest("[data-retry]");
@@ -409,8 +484,7 @@ document.addEventListener("click", async (event) => {
         `¿Entregar el pedido de ${order.client_name}? Saldo pendiente: ${money(Math.max(0, order.price - order.advance_payment))}.`;
       openDialog("confirmDialog");
     } else {
-      if (await changeStatus(id, flow.dataset.status, flow))
-        await syncWorkshop(true);
+      await changeStatus(id, flow.dataset.status, flow);
     }
     return;
   }
@@ -433,50 +507,90 @@ document.addEventListener("click", async (event) => {
   }
 });
 
-$("confirmDelivery").addEventListener("click", async (event) => {
+for (const dialog of [$("orderDialog"), $("noteDialog"), $("confirmDialog")]) {
+  dialog.addEventListener("cancel", (event) => {
+    if (dialog.querySelector('[aria-busy="true"]')) event.preventDefault();
+  });
+}
+
+$("confirmDelivery").addEventListener("click", (event) => {
   if (deliveryId === null) return;
-  if (await changeStatus(deliveryId, "ENTREGADO", event.currentTarget)) {
-    $("confirmDialog").close();
-    deliveryId = null;
-    await syncWorkshop(true);
-  }
+  $("confirmError").hidden = true;
+  changeStatus(deliveryId, "ENTREGADO", event.currentTarget);
 });
+
+for (const button of dateShortcuts) {
+  button.addEventListener("click", () => {
+    $("delivery_date").value = localDate(Number(button.dataset.dateOffset));
+    updateScheduleShortcuts();
+  });
+}
+for (const button of hourShortcuts) {
+  button.addEventListener("click", () => {
+    $("delivery_hour").value = button.dataset.deliveryHour;
+    updateScheduleShortcuts();
+  });
+}
+$("delivery_date").addEventListener("input", updateScheduleShortcuts);
+$("delivery_hour").addEventListener("input", updateScheduleShortcuts);
+for (const field of [$("price"), $("advance_payment")]) {
+  field.addEventListener("input", () => {
+    if ($("advance_payment").hasAttribute("aria-invalid")) {
+      $("advance_payment").removeAttribute("aria-invalid");
+      $("orderFormError").hidden = true;
+    }
+    updateOrderBalance();
+  });
+}
 
 $("orderForm").addEventListener("submit", (event) =>
   submitForm(
     event,
     "/orders/",
-    () => {
+    (form) => {
+      $("orderSaved").textContent = "";
       if (Number($("advance_payment").value) > Number($("price").value)) {
-        showFormError(
-          $("orderForm"),
-          "El adelanto no puede superar el precio total.",
-        );
+        showFormError(form, "El adelanto no puede superar el precio total.");
         $("advance_payment").setAttribute("aria-invalid", "true");
         $("advance_payment").focus();
         return null;
       }
-      if (!$("client_name").value.trim() || !$("details").value.trim()) {
-        showFormError(
-          $("orderForm"),
-          "Escribe el nombre del cliente y el detalle del trabajo.",
-        );
+      const client = $("client_name");
+      const details = $("details");
+      if (!client.value.trim() || !details.value.trim()) {
+        showFormError(form, "Escribe el nombre del cliente y el detalle del trabajo.");
+        (client.value.trim() ? details : client).focus();
         return null;
       }
       return {
-        client_name: $("client_name").value.trim(),
-        details: $("details").value.trim(),
+        client_name: client.value.trim(),
+        details: details.value.trim(),
         price: Number($("price").value),
         advance_payment: Number($("advance_payment").value || 0),
-        priority: $("priority").value,
+        priority: form.elements.priority.value,
         delivery_time: `${$("delivery_date").value}T${$("delivery_hour").value}`,
       };
     },
-    "Pedido guardado. Ya está en el tablero.",
+    async (form, order) => {
+      const keepOpen = form.elements.keepOpen.checked;
+      form.reset();
+      $("advance_payment").removeAttribute("aria-invalid");
+      if (keepOpen) {
+        form.elements.keepOpen.checked = true;
+        $("delivery_date").value = localDate();
+        updateScheduleShortcuts();
+        updateOrderBalance();
+        $("client_name").focus();
+        $("orderSaved").textContent = "Pedido guardado en Pendientes. Puedes registrar el siguiente.";
+      } else {
+        $("orderDialog").close();
+        const feedback = stageFeedback.PENDIENTES;
+        toast(feedback.text, false, feedback.color);
+      }
+      await syncWorkshop(true);
+      if (!keepOpen) animateOrderStage(order.id, "PENDIENTES");
+    },
   ),
-);
-$("advance_payment").addEventListener("input", () =>
-  $("advance_payment").removeAttribute("aria-invalid"),
 );
 $("noteForm").addEventListener("submit", (event) =>
   submitForm(
@@ -493,7 +607,12 @@ $("noteForm").addEventListener("submit", (event) =>
       }
       return { content };
     },
-    "Nota guardada.",
+    async (form) => {
+      $("noteDialog").close();
+      form.reset();
+      toast("Nota guardada.");
+      await syncWorkshop(true);
+    },
   ),
 );
 $("orderSearch").addEventListener("input", renderOrders);

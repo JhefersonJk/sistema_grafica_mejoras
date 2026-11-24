@@ -84,14 +84,37 @@ def main():
                 page.get_by_role("button", name="Nuevo pedido", exact=True).click()
                 page.get_by_label("Cliente", exact=True).fill("Ana <img src=x onerror=alert(1)>")
                 page.get_by_label("Detalle del trabajo").fill("500 tarjetas · Papel couché 300 g")
-                page.get_by_label("Hora de entrega").fill("17:00")
+                today = page.get_by_label("Fecha de entrega", exact=True).input_value()
+                page.get_by_role("button", name="Mañana", exact=True).click()
+                assert page.get_by_label("Fecha de entrega", exact=True).input_value() > today
+                expect(page.get_by_role("button", name="Mañana")).to_have_attribute(
+                    "aria-pressed", "true"
+                )
+                page.get_by_role("button", name="17:00", exact=True).click()
+                expect(page.get_by_label("Hora de entrega", exact=True)).to_have_value("17:00")
+                page.get_by_label("Hora de entrega", exact=True).fill("16:00")
+                expect(page.get_by_role("button", name="17:00")).to_have_attribute(
+                    "aria-pressed", "false"
+                )
+                page.get_by_role("radio", name="Sin prisa").check()
                 page.get_by_label("Precio total (Bs)").fill("240")
                 page.get_by_label("Adelanto (Bs)").fill("300")
                 page.get_by_role("button", name="Guardar pedido").click()
                 expect(page.get_by_role("alert").filter(has_text="El adelanto")).to_be_visible()
                 page.get_by_label("Adelanto (Bs)").fill("80")
+                expect(page.locator("#orderBalance")).to_contain_text("160")
+                expect(page.locator("#orderFormError")).to_be_hidden()
+                page.get_by_role("checkbox", name="Registrar otro después de guardar").check()
                 page.get_by_role("button", name="Guardar pedido").click()
+                expect(page.locator("#orderSaved")).to_contain_text("Pedido guardado en Pendientes")
+                expect(page.get_by_label("Cliente", exact=True)).to_be_focused()
+                expect(page.get_by_label("Cliente", exact=True)).to_have_value("")
+                expect(page.get_by_label("Fecha de entrega", exact=True)).to_have_value(today)
+                expect(page.get_by_role("radio", name="Normal")).to_be_checked()
+                expect(page.locator("#orderBalance")).to_have_text("—")
+                page.keyboard.press("Escape")
                 expect(page.locator("#activeCount")).to_have_text("1")
+                expect(page.locator(".order-card .priority-badge")).to_have_text("Sin prisa")
                 expect(page.locator(".order-card img")).to_have_count(0)
                 expect(page.locator("#summaryDue")).to_contain_text("160")
                 page.get_by_role("searchbox").fill("sin coincidencias")
@@ -110,13 +133,23 @@ def main():
                     await syncWorkshop(true);
                     return button.isConnected && button === document.activeElement;
                 }""")
+                page.route("**/status**", lambda route: route.abort())
                 flow.click()
+                expect(page.locator(".toast.error")).to_contain_text("No se pudo actualizar")
+                expect(page.locator("#countPending")).to_have_text("1")
+                page.unroute("**/status**")
+                flow.click()
+                expect(page.locator(".toast.magenta")).to_have_text("Pedido en producción.")
                 expect(page.locator("#countProduction")).to_have_text("1")
-                page.get_by_role("button", name="Marcar como listo").click()
+                ready = page.get_by_role("button", name="Marcar como listo")
+                expect(ready).to_be_focused()
+                ready.click()
+                expect(page.locator(".toast.yellow")).to_have_text("Pedido listo para entrega.")
                 expect(page.locator("#readyCount")).to_have_text("1")
                 page.get_by_role("button", name="Entregar y cobrar").click()
                 expect(page.get_by_role("dialog", name="Confirmar entrega")).to_be_visible()
                 page.get_by_role("button", name="Confirmar entrega", exact=True).click()
+                expect(page.locator(".toast.delivered")).to_contain_text("Pedido entregado")
                 expect(page.locator("#activeCount")).to_have_text("0")
                 expect(page.locator("#summaryCollected")).to_contain_text("240")
                 page.get_by_role("button", name="Historial de entregas").click()
@@ -213,9 +246,11 @@ def main():
                 expect(page.locator("#activeCount")).to_have_text("5")
                 page.screenshot(path=str(ARTIFACTS / "desktop-cmyk.png"), full_page=True)
                 for width, height in [
+                    (320, 590),
                     (375, 812),
+                    (641, 600),
                     (768, 1024),
-                    (1024, 768),
+                    (1024, 480),
                     (1440, 1050),
                     (812, 375),
                 ]:
@@ -224,8 +259,18 @@ def main():
                     assert not page.evaluate("document.documentElement.scrollWidth > innerWidth"), (
                         f"Overflow a {width}px"
                     )
+                    assert page.locator(".sidebar").evaluate(
+                        "(sidebar) => sidebar.scrollWidth <= sidebar.clientWidth"
+                    ), f"Navegación recortada a {width}px"
                     page.get_by_role("button", name="Nuevo pedido", exact=True).click()
                     expect(page.get_by_label("Cliente", exact=True)).to_be_visible()
+                    assert page.locator(".order-form-body").evaluate(
+                        "(body) => body.scrollWidth <= body.clientWidth"
+                    ), f"Formulario recortado a {width}px"
+                    save = page.get_by_role("button", name="Guardar pedido")
+                    expect(save).to_be_in_viewport()
+                    if width in {320, 1440}:
+                        page.screenshot(path=str(ARTIFACTS / f"pedido-{width}.png"))
                     page.keyboard.press("Escape")
                     if width == 375:
                         page.screenshot(path=str(ARTIFACTS / "mobile-cmyk.png"), full_page=True)
@@ -274,7 +319,7 @@ def main():
                 assert not errors, errors
                 browser.close()
                 print(
-                    "PASS UI: formularios, validación, XSS, filtros, flujo completo, historial, reporte, notas, error de red, teclado y 5 viewports. Sin errores JS."
+                    "PASS UI: formularios, validación, XSS, filtros, flujo completo, historial, reporte, notas, error de red, teclado y 7 tamaños de pantalla. Sin errores JS."
                 )
                 print(f"Capturas: {ARTIFACTS}")
         finally:
